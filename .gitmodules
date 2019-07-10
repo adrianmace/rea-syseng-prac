@@ -1,0 +1,3 @@
+[submodule "simple-sinatra-app"]
+	path = simple-sinatra-app
+	url = https://github.com/rea-cruitment/simple-sinatra-app.git
