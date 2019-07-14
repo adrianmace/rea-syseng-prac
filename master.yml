@@ -37,9 +37,9 @@ Resources:
       Type: AWS::EC2::VPC
       Properties:
           CidrBlock: !Ref VpcCIDR
-        Tags:
-          - Key: Name
-            Value: !Ref EnvironmentName
+          Tags:
+            - Key: Name
+              Value: !Ref EnvironmentName
 
   # Define an internet egress point
   InternetGateway:
