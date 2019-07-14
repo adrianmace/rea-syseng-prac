@@ -8,27 +8,27 @@ Parameters:
   VpcCIDR:
       Description: Please enter the IP range (CIDR notation) for this VPC
       Type: String
-      Default: 10.0.0.0/8
+      Default: 172.16.0.0/16
 
   AZ1PublicSubnetCIDR:
       Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
       Type: String
-      Default: 10.0.1.0/24
+      Default: 172.16.1.0/24
 
   AZ2PublicSubnetCIDR:
       Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
       Type: String
-      Default: 10.0.2.0/24
+      Default: 172.16.2.0/24
 
   AZ1PrivateSubnetCIDR:
       Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
       Type: String
-      Default: 10.0.101.0/24
+      Default: 172.16.101.0/24
 
   AZ2PrivateSubnetCIDR:
       Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
       Type: String
-      Default: 10.0.102.0/24
+      Default: 172.16.102.0/24
 
 Resources:
   # --- Virtual Private Cloud Resources ---
@@ -202,9 +202,64 @@ Resources:
           SubnetId: !Ref AZ2PrivateSubnet
 
   # --- Application Load Balancer Resources ---
-  # Define and build the load balancer (complete with health checks)
+  # Define a security group for the load balancer
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: Access to the application load balancer
+      SecurityGroupIngress:
+        # Allow access from anywhere to our EC2 services
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: -1
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-LoadBalancer
 
-  # --- Auto Scaling Group Resources
+  # Define an application load balancer connected to both public AZs
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Ref EnvironmentName
+      Subnets: [ !Ref AZ1PublicSubnet, !Ref AZ2PublicSubnet ]
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+  # Define a listener for the load balancer (Port 80)
+  LoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  # Define a target group for the service
+  # This includes a health check to remove unhealthy instances in less than a minute
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${EnvironmentName}-DefaultTargetGroup
+      VpcId: !Ref VPC
+      Port: 80
+      Protocol: HTTP
+      Matcher:
+        HttpCode: 200-299
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+
+  # --- Auto Scaling Group Resources ---
   # Define and build the auto scaling group
 
 Outputs:
+  REAcruitmentURL:
+    Description: The URL endpoint for the REA-cruitment app
+    Value: !Join ["", [!GetAtt ALB.Outputs.LoadBalancerUrl, "/"]]
