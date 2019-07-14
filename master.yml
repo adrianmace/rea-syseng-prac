@@ -58,11 +58,15 @@ Parameters:
     MaxValue: 100
     ConstraintDescription: must be a number between 1-100.
 
-  
-  REAcruitmentSource:
-    Description: Please specify the Github project URL pointing to the sinatra deployment files
+  AppSource:
+    Description: Please specify the Github project URL for the app you wish to deploy
     Type: String
     Default: https://github.com/adrianmace/rea-syseng-prac
+
+  AppBranch:
+    Description: Please specify the branch you would like to deploy
+    Type: String
+    Default: master
 
 Mappings:
   AWSInstanceType2Arch:
@@ -80,63 +84,38 @@ Mappings:
     t2.large:
       Arch: NATHVM64
   AWSRegionArch2AMI:
-    us-east-1:
-      HVM64: ami-0080e4c5bc078760e
-      HVMG2: ami-0aeb704d503081ea6
-    us-west-2:
-      HVM64: ami-01e24be29428c15b2
-      HVMG2: ami-0fe84a5b4563d8f27
-    us-west-1:
-      HVM64: ami-0ec6517f6edbf8044
-      HVMG2: ami-0a7fc72dc0e51aa77
-    eu-west-1:
-      HVM64: ami-08935252a36e25f85
-      HVMG2: ami-0d5299b1c6112c3c7
-    eu-west-2:
-      HVM64: ami-01419b804382064e4
-      HVMG2: NOT_SUPPORTED
-    eu-west-3:
-      HVM64: ami-0dd7e7ed60da8fb83
-      HVMG2: NOT_SUPPORTED
-    eu-central-1:
-      HVM64: ami-0cfbf4f6db41068ac
-      HVMG2: ami-0aa1822e3eb913a11
     eu-north-1:
-      HVM64: ami-86fe70f8
-      HVMG2: ami-32d55b4c
-    ap-northeast-1:
-      HVM64: ami-00a5245b4816c38e6
-      HVMG2: ami-09d0e0e099ecabba2
-    ap-northeast-2:
-      HVM64: ami-00dc207f8ba6dc919
-      HVMG2: NOT_SUPPORTED
-    ap-northeast-3:
-      HVM64: ami-0b65f69a5c11f3522
-      HVMG2: NOT_SUPPORTED
-    ap-southeast-1:
-      HVM64: ami-05b3bcf7f311194b3
-      HVMG2: ami-0e46ce0d6a87dc979
-    ap-southeast-2:
-      HVM64: ami-02fd0b06f06d93dfc
-      HVMG2: ami-0c0ab057a101d8ff2
+      HVM64: ami-3a199744
     ap-south-1:
-      HVM64: ami-0ad42f4f66f6c1cc9
-      HVMG2: ami-0244c1d42815af84a
-    us-east-2:
-      HVM64: ami-0cd3dfa4e37921605
-      HVMG2: NOT_SUPPORTED
-    ca-central-1:
-      HVM64: ami-07423fb63ea0a0930
-      HVMG2: NOT_SUPPORTED
+      HVM64: ami-09243352e7fc54770
+    eu-west-3:
+      HVM64: ami-0a11f29b2c0da413d
+    eu-west-2:
+      HVM64: ami-0aff88ed576e63e90
+    eu-west-1:
+      HVM64: ami-0f048a9d88ce87044
+    ap-northeast-2:
+      HVM64: ami-0598d826139c09e4f
+    ap-northeast-1:
+      HVM64: ami-0bab560bf1ee352f5
     sa-east-1:
-      HVM64: ami-05145e0b28ad8e0b2
-      HVMG2: NOT_SUPPORTED
-    cn-north-1:
-      HVM64: ami-053617c9d818c1189
-      HVMG2: NOT_SUPPORTED
-    cn-northwest-1:
-      HVM64: ami-0f7937761741dc640
-      HVMG2: NOT_SUPPORTED
+      HVM64: ami-08148a76db58400c2
+    ca-central-1:
+      HVM64: ami-0a45b3ec939a5974a
+    ap-southeast-1:
+      HVM64: ami-0d53ac3145db0eace
+    ap-southeast-2:
+      HVM64: ami-00c3d41691e25e54c
+    eu-central-1:
+      HVM64: ami-0d16ecbd2762ae54a
+    us-east-1:
+      HVM64: ami-01e3b8c3a51e88954
+    us-east-2:
+      HVM64: ami-049ceee18ac22d417
+    us-west-1:
+      HVM64: ami-0a16c82eb0cc3aad8
+    us-west-2:
+      HVM64: ami-03c652d3a09856345
 
 Resources:
   # --- Virtual Private Cloud Resources ---
@@ -384,15 +363,13 @@ Resources:
   ASGLaunchConfig:
     Type: 'AWS::AutoScaling::LaunchConfiguration'
     Metadata:
-      Comment: Install the REA-cruitment source
+      Comment: cloud-init script to handle docker installation
       'AWS::CloudFormation::Init':
         config:
           packages:
             yum:
-              ruby: []
               git: []
-              nginx: []
-              screen: []
+              docker: []
           files:
             /etc/cfn/cfn-hup.conf:
               content: !Join 
@@ -430,6 +407,8 @@ Resources:
               mode: '000400'
               owner: root
               group: root
+          sources:
+            /app: !Sub ${AppSource}/tarball/${AppBranch}
           services:
             sysvinit:
               cfn-hup:
@@ -438,6 +417,9 @@ Resources:
                 files:
                   - /etc/cfn/cfn-hup.conf
                   - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+              docker:
+                enabled: 'true'
+                ensureRunning: 'true'
     Properties:
       ImageId: !FindInMap [ AWSRegionArch2AMI, !Ref 'AWS::Region', !FindInMap [ AWSInstanceType2Arch, !Ref InstanceType, Arch ]]
       SecurityGroups: [ !Ref EC2SecurityGroup ]
@@ -456,19 +438,15 @@ Resources:
             - '         --region '
             - !Ref 'AWS::Region'
             - |+
-
-            - 'git clone '
-            - !Ref REAcruitmentSource
-            - |+
-
-            - 'cd '
-            - !Select [4, !Split ["/", !Ref REAcruitmentSource]]
-            - |+
-
+              
             - |
-              git checkout asg-deploy-strat-1
+              'cd /app && sudo git submodule update --init --recursive'
+            - |+
+              
             - |
-              /bin/bash deploy.sh
+              'sudo docker build -t app:latest /app && sudo docker run -d -p 80:80 --restart=always app:latest'
+            - |+
+               
             - '/opt/aws/bin/cfn-signal -e $? '
             - '         --stack '
             - !Ref 'AWS::StackName'
@@ -504,6 +482,6 @@ Resources:
         TargetValue: !Ref CPUUtilTargetValue
 
 Outputs:
-  REAcruitmentURL:
-    Description: The URL endpoint for the REA-cruitment app
+  AppURL:
+    Description: The URL endpoint for the app
     Value: !Join ["", [!GetAtt LoadBalancer.DNSName, "/"]]
