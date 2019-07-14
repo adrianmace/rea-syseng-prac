@@ -49,11 +49,20 @@ Parameters:
     Description: What is the maximum number of EC2 hosts you want to deploy?
     Type: Number
     Default: 10
+
+  CPUUtilTargetValue:
+    Description: What is the target CPU Utilisation % within the ASG?
+    Type: Number
+    Default: 70
+    MinValue: 1
+    MaxValue: 100
+    ConstraintDescription: must be a number between 1-100.
+
   
   REAcruitmentSource:
-    Description: Please specify the Github URL pointing to the sinatra deployment files
+    Description: Please specify the Github project URL pointing to the sinatra deployment files
     Type: String
-    Default: https://github.com/adrianmace/rea-syseng-prac.git
+    Default: https://github.com/adrianmace/rea-syseng-prac
 
 Mappings:
   AWSInstanceType2Arch:
@@ -430,8 +439,8 @@ Resources:
                   - /etc/cfn/cfn-hup.conf
                   - /etc/cfn/hooks.d/cfn-auto-reloader.conf
     Properties:
-      ImageId: !FindInMap [ AWSRegionArch2AMI, !Ref AWS::Region, !FindInMap [ AWSInstanceType2Arch, !Ref InstanceType, Arch ]]
-      SecurityGroups: !Ref InstanceSecurityGroup
+      ImageId: !FindInMap [ AWSRegionArch2AMI, !Ref 'AWS::Region', !FindInMap [ AWSInstanceType2Arch, !Ref InstanceType, Arch ]]
+      SecurityGroups: [ !Ref EC2SecurityGroup ]
       InstanceType: !Ref InstanceType
       UserData: !Base64 
         'Fn::Join':
@@ -440,8 +449,6 @@ Resources:
               #!/bin/bash -xe
             - |
               yum update -y aws-cfn-bootstrap
-            - |
-              yum update -y aws-cli
             - '/opt/aws/bin/cfn-init -v '
             - '         --stack '
             - !Ref 'AWS::StackName'
@@ -449,14 +456,19 @@ Resources:
             - '         --region '
             - !Ref 'AWS::Region'
             - |+
+
             - 'git clone '
             - !Ref REAcruitmentSource
             - |+
+
             - 'cd '
-            - !Select [3, !Split ["/", !Ref REAcruitmentSource]]
+            - !Select [4, !Split ["/", !Ref REAcruitmentSource]]
             - |+
-            - '/bin/bash deploy.sh'
-            - |+
+
+            - |
+              git checkout asg-deploy-strat-1
+            - |
+              /bin/bash deploy.sh
             - '/opt/aws/bin/cfn-signal -e $? '
             - '         --stack '
             - !Ref 'AWS::StackName'
@@ -467,73 +479,31 @@ Resources:
 
   # Define the ASG itself with min and maximum values
   AutoScalingGroup:
-    AutoScalingGroupName: !Sub ${EnvironmentName}-ASG
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
-      VPCZoneIdentifier: !Ref VPC 
+      AutoScalingGroupName: !Sub ${EnvironmentName}-ASG
+      VPCZoneIdentifier:  [ !Ref AZ1PrivateSubnet, !Ref AZ2PrivateSubnet ]
       LaunchConfigurationName: !Ref ASGLaunchConfig
       MinSize: !Ref InitialClusterSize
       MaxSize: !Ref MaximumClusterSize
-      LoadBalancerNames: !Ref LoadBalancer
+      TargetGroupARNs: [ !Ref TargetGroup ]
       Tags:
         - Key: Name
+          PropagateAtLaunch: True
           Value: !Sub ${EnvironmentName}-ASG
-  
-  # Define the action to take when high CPU alarm is triggered
-  ASGScaleUpPolicy:
-    Type: "AWS::ApplicationAutoScaling::ScalingPolicy"
+
+  # Define a scaling policy to maintain an average CPU Util of value specified by operator
+  ScalingPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
     Properties:
       AutoScalingGroupName: !Ref AutoScalingGroup
-      AdjustmentType: ChangeInCapacity
-      Cooldown: '1'
-      ScalingAdjustment: 1
-
-  # Define the action to take when low CPU alarm is triggered
-  ASGScaleDownPolicy:
-    Type: "AWS::ApplicationAutoScaling::ScalingPolicy"
-    Properties:
-      AutoScalingGroupName: !Ref AutoScalingGroup
-      AdjustmentType: ChangeInCapacity
-      Cooldown: '1'
-      ScalingAdjustment: -1
-
-  # Define the High CPU alarm for the ASG
-  ASGHighCPUAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: CPU utilization greater than 90%
-      AlarmDescription: The automatic scaling group is under high load
-      Namespace: AWS/EC2
-      Dimensions:
-        - Name: AutoScalingGroupName
-          Value: !Ref AutoScalingGroup
-      MetricName: CPUUtilization
-      Statistic: Average
-      Period: "60"
-      EvaluationPeriods: "3"
-      Threshold: "90"
-      ComparisonOperator: GreaterThanThreshold
-      AlarmActions: !Ref ASGScaleUpPolicy
-
-  # Define the low CPU alarm for the ASG
-  ASGLowCPUAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: CPU utilization less than 70%
-      AlarmDescription: The automatic scaling group is under low load
-      Namespace: AWS/EC2
-      Dimensions:
-        - Name: AutoScalingGroupName
-          Value: !Ref AutoScalingGroup
-      MetricName: CPUUtilization
-      Statistic: Average
-      Period: "60"
-      EvaluationPeriods: "10"
-      Threshold: "70"
-      ComparisonOperator: LessThanThreshold
-      AlarmActions: !Ref ASGScaleDownPolicy
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ASGAverageCPUUtilization
+        TargetValue: !Ref CPUUtilTargetValue
 
 Outputs:
   REAcruitmentURL:
     Description: The URL endpoint for the REA-cruitment app
-    Value: !Join ["", [!GetAtt ALB.Outputs.LoadBalancerUrl, "/"]]
+    Value: !Join ["", [!GetAtt LoadBalancer.DNSName, "/"]]
