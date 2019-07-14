@@ -1,0 +1,210 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: ---
+Parameters:
+  EnvironmentName:
+      Description: An environment name that will be prefixed to resource names. eg. Prod, Test, Dev, etc.
+      Type: String
+
+  VpcCIDR:
+      Description: Please enter the IP range (CIDR notation) for this VPC
+      Type: String
+      Default: 10.0.0.0/8
+
+  AZ1PublicSubnetCIDR:
+      Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
+      Type: String
+      Default: 10.0.1.0/24
+
+  AZ2PublicSubnetCIDR:
+      Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
+      Type: String
+      Default: 10.0.2.0/24
+
+  AZ1PrivateSubnetCIDR:
+      Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
+      Type: String
+      Default: 10.0.101.0/24
+
+  AZ2PrivateSubnetCIDR:
+      Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+      Type: String
+      Default: 10.0.102.0/24
+
+Resources:
+  # --- Virtual Private Cloud Resources ---
+  # Define a VPC
+  VPC:
+      Type: AWS::EC2::VPC
+      Properties:
+          CidrBlock: !Ref VpcCIDR
+        Tags:
+          - Key: Name
+            Value: !Ref EnvironmentName
+
+  # Define an internet egress point
+  InternetGateway:
+      Type: AWS::EC2::InternetGateway
+      Properties:
+        Tags:
+          - Key: Name
+            Value: !Ref EnvironmentName
+
+  # Link the internet gateway to the VPC created
+  InternetGatewayAttachment:
+      Type: AWS::EC2::VPCGatewayAttachment
+      Properties:
+          InternetGatewayId: !Ref InternetGateway
+          VpcId: !Ref VPC
+
+  # Define the public subnets for each AZ
+  AZ1PublicSubnet:
+      Type: AWS::EC2::Subnet
+      Properties:
+          VpcId: !Ref VPC
+          AvailabilityZone: !Select [ 0, !GetAZs ]
+          CidrBlock: !Ref AZ1PublicSubnetCIDR
+          MapPublicIpOnLaunch: true
+          Tags:
+            - Key: Name
+              Value: !Sub ${EnvironmentName} Public Subnet (AZ1)
+
+  AZ2PublicSubnet:
+      Type: AWS::EC2::Subnet
+      Properties:
+          VpcId: !Ref VPC
+          AvailabilityZone: !Select [ 1, !GetAZs ]
+          CidrBlock: !Ref AZ2PublicSubnetCIDR
+          MapPublicIpOnLaunch: true
+          Tags:
+            - Key: Name
+              Value: !Sub ${EnvironmentName} Public Subnet (AZ2)
+
+  # Define the private subnets for each AZ
+  AZ1PrivateSubnet:
+      Type: AWS::EC2::Subnet
+      Properties:
+          VpcId: !Ref VPC
+          AvailabilityZone: !Select [ 0, !GetAZs ]
+          CidrBlock: !Ref AZ1PrivateSubnetCIDR
+          MapPublicIpOnLaunch: false
+          Tags:
+            - Key: Name
+              Value: !Sub ${EnvironmentName} Private Subnet (AZ1)
+
+  AZ2PrivateSubnet:
+      Type: AWS::EC2::Subnet
+      Properties:
+          VpcId: !Ref VPC
+          AvailabilityZone: !Select [ 1, !GetAZs ]
+          CidrBlock: !Ref AZ2PrivateSubnetCIDR
+          MapPublicIpOnLaunch: false
+          Tags:
+            - Key: Name
+              Value: !Sub ${EnvironmentName} Private Subnet (AZ2)
+
+  # Create a NAT gateway for each AZ using an elastic IP
+  AZ1NATGatewayEIP:
+      Type: AWS::EC2::EIP
+      DependsOn: InternetGatewayAttachment
+      Properties:
+          Domain: vpc
+
+  AZ2NATGatewayEIP:
+      Type: AWS::EC2::EIP
+      DependsOn: InternetGatewayAttachment
+      Properties:
+          Domain: vpc
+
+  AZ1NATGateway:
+      Type: AWS::EC2::NatGateway
+      Properties:
+          AllocationId: !GetAtt AZ1NATGatewayEIP.AllocationId
+          SubnetId: !Ref AZ1PublicSubnet
+
+  AZ2NATGateway:
+      Type: AWS::EC2::NatGateway
+      Properties:
+          AllocationId: !GetAtt AZ2NATGatewayEIP.AllocationId
+          SubnetId: !Ref AZ2PublicSubnet
+
+  # Set up the generic public routing table used by all public subnets
+  # Both public subnets only require the default route via the internet gateway
+  PublicRouteTable:
+      Type: AWS::EC2::RouteTable
+      Properties:
+          VpcId: !Ref VPC
+          Tags:
+            - Key: Name
+              Value: !Sub ${EnvironmentName} Public Routes
+
+  DefaultPublicRoute:
+      Type: AWS::EC2::Route
+      DependsOn: InternetGatewayAttachment
+      Properties:
+          RouteTableId: !Ref PublicRouteTable
+          DestinationCidrBlock: 0.0.0.0/0
+          GatewayId: !Ref InternetGateway
+
+  AZ1PublicSubnetRouteTableAssociation:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+          RouteTableId: !Ref PublicRouteTable
+          SubnetId: !Ref AZ1PublicSubnet
+
+  AZ2PublicSubnetRouteTableAssociation:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+          RouteTableId: !Ref PublicRouteTable
+          SubnetId: !Ref AZ2PublicSubnet
+
+  # Set up the private routing tables for each of the private subnets
+  # Each private subnet uses their respective NAT gateway as an egress point
+  AZ1PrivateRouteTable:
+      Type: AWS::EC2::RouteTable
+      Properties:
+          VpcId: !Ref VPC
+          Tags:
+            - Key: Name
+              Value: !Sub ${EnvironmentName} Private Routes (AZ1)
+
+  AZ1DefaultPrivateRoute:
+      Type: AWS::EC2::Route
+      Properties:
+          RouteTableId: !Ref AZ1PrivateRouteTable
+          DestinationCidrBlock: 0.0.0.0/0
+          NatGatewayId: !Ref AZ1NATGateway
+
+  AZ1PrivateSubnetRouteTableAssociation:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+          RouteTableId: !Ref AZ1PrivateRouteTable
+          SubnetId: !Ref AZ1PrivateSubnet
+
+  AZ2PrivateRouteTable:
+      Type: AWS::EC2::RouteTable
+      Properties:
+          VpcId: !Ref VPC
+          Tags:
+            - Key: Name
+              Value: !Sub ${EnvironmentName} Private Routes (AZ2)
+
+  AZ2DefaultPrivateRoute:
+      Type: AWS::EC2::Route
+      Properties:
+          RouteTableId: !Ref AZ2PrivateRouteTable
+          DestinationCidrBlock: 0.0.0.0/0
+          NatGatewayId: !Ref AZ2NATGateway
+
+  AZ2PrivateSubnetRouteTableAssociation:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+          RouteTableId: !Ref AZ2PrivateRouteTable
+          SubnetId: !Ref AZ2PrivateSubnet
+
+  # --- Application Load Balancer Resources ---
+  # Define and build the load balancer (complete with health checks)
+
+  # --- Auto Scaling Group Resources
+  # Define and build the auto scaling group
+
+Outputs:
