@@ -416,4 +416,4 @@ Resources:
 Outputs:
   AppURL:
     Description: The URL endpoint for the app
-    Value: !Join ["", [!GetAtt LoadBalancer.DNSName, "/"]]
+    Value: !Join ["", ["http://", !GetAtt LoadBalancer.DNSName, "/"]]
