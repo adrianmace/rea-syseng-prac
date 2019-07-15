@@ -5,26 +5,31 @@ Parameters:
       Description: Please enter the IP range (CIDR notation) for this VPC
       Type: String
       Default: 172.16.0.0/16
+      AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
 
   AZ1PublicSubnetCIDR:
       Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
       Type: String
       Default: 172.16.1.0/24
+      AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
 
   AZ2PublicSubnetCIDR:
       Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
       Type: String
       Default: 172.16.2.0/24
+      AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
 
   AZ1PrivateSubnetCIDR:
       Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
       Type: String
       Default: 172.16.101.0/24
+      AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
 
   AZ2PrivateSubnetCIDR:
       Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
       Type: String
       Default: 172.16.102.0/24
+      AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
 
   InstanceType:
     Description: Please select an instance type for your EC2 hosts
@@ -40,11 +45,17 @@ Parameters:
     Description: How many EC2 hosts do you want to initially deploy?
     Type: Number
     Default: 4
+    MinValue: 2
+    MaxValue: 100
+    ConstraintDescription: must be a number between 2-100.
 
   MaximumClusterSize:
     Description: What is the maximum number of EC2 hosts you want to deploy?
     Type: Number
     Default: 10
+    MinValue: 2
+    MaxValue: 100
+    ConstraintDescription: must be a number between 2-100.
 
   CPUUtilTargetValue:
     Description: What is the target CPU Utilisation % within the ASG?
@@ -58,6 +69,8 @@ Parameters:
     Description: Please specify the Github project URL for the app you wish to deploy
     Type: String
     Default: https://github.com/adrianmace/rea-syseng-prac
+    AllowedPattern: 'https:\/\/(?:www.)?github\.com\/.*\/.*'
+    ConstraintDescription: 'must be a github.com project URL. (eg: https://github.com/username/project)'
 
   AppBranch:
     Description: Please specify the branch you would like to deploy
@@ -72,6 +85,7 @@ Mappings:
       Arch: HVM64
     t2.large:
       Arch: HVM64
+  # In all cases, the Amazon Linux 2 AMI is selected (amzn2-ami-hvm-2.0.20190618-x86_64-gp2)
   AWSRegionArch2AMI:
     eu-north-1:
       HVM64: ami-3a199744
