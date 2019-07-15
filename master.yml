@@ -362,64 +362,64 @@ Resources:
   # Define the launch configuration for each new instance
   ASGLaunchConfig:
     Type: 'AWS::AutoScaling::LaunchConfiguration'
-    Metadata:
-      Comment: cloud-init script to handle docker installation
-      'AWS::CloudFormation::Init':
-        config:
-          packages:
-            yum:
-              git: []
-              docker: []
-          files:
-            /etc/cfn/cfn-hup.conf:
-              content: !Join 
-                - ''
-                - - |
-                    [main]
-                  - stack=
-                  - !Ref 'AWS::StackId'
-                  - |+
-                  - region=
-                  - !Ref 'AWS::Region'
-                  - |+
-              mode: '000400'
-              owner: root
-              group: root
-            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
-              content: !Join 
-                - ''
-                - - |
-                    [cfn-auto-reloader-hook]
-                  - |
-                    triggers=post.update
-                  - >
-                    path=Resources.LaunchConfig.Metadata.AWS::CloudFormation::Init
-                  - 'action=/opt/aws/bin/cfn-init -v '
-                  - '         --stack '
-                  - !Ref 'AWS::StackName'
-                  - '         --resource LaunchConfig '
-                  - '         --region '
-                  - !Ref 'AWS::Region'
-                  - |+
+    # Metadata:
+    #   Comment: cloud-init script to handle docker installation
+    #   'AWS::CloudFormation::Init':
+    #     config:
+    #       packages:
+    #         yum:
+    #           git: []
+    #           docker: []
+    #       files:
+    #         /etc/cfn/cfn-hup.conf:
+    #           content: !Join 
+    #             - ''
+    #             - - |
+    #                 [main]
+    #               - stack=
+    #               - !Ref 'AWS::StackId'
+    #               - |+
+    #               - region=
+    #               - !Ref 'AWS::Region'
+    #               - |+
+    #           mode: '000400'
+    #           owner: root
+    #           group: root
+    #         /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+    #           content: !Join 
+    #             - ''
+    #             - - |
+    #                 [cfn-auto-reloader-hook]
+    #               - |
+    #                 triggers=post.update
+    #               - >
+    #                 path=Resources.LaunchConfig.Metadata.AWS::CloudFormation::Init
+    #               - 'action=/opt/aws/bin/cfn-init -v '
+    #               - '         --stack '
+    #               - !Ref 'AWS::StackName'
+    #               - '         --resource LaunchConfig '
+    #               - '         --region '
+    #               - !Ref 'AWS::Region'
+    #               - |+
 
-                  - |
-                    runas=root
-              mode: '000400'
-              owner: root
-              group: root
-          sources:
-            /app: !Sub ${AppSource}/tarball/${AppBranch}
-          services:
-            sysvinit:
-              cfn-hup:
-                enabled: 'true'
-                ensureRunning: 'true'
-                files:
-                  - /etc/cfn/cfn-hup.conf
-                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
-              docker:
-                enabled: 'true'
-                ensureRunning: 'true'
+    #               - |
+    #                 runas=root
+    #           mode: '000400'
+    #           owner: root
+    #           group: root
+    #       sources:
+    #         /app: !Sub ${AppSource}/tarball/${AppBranch}
+    #       services:
+    #         sysvinit:
+    #           cfn-hup:
+    #             enabled: 'true'
+    #             ensureRunning: 'true'
+    #             files:
+    #               - /etc/cfn/cfn-hup.conf
+    #               - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+    #           docker:
+    #             enabled: 'true'
+    #             ensureRunning: 'true'
     Properties:
       ImageId: !FindInMap [ AWSRegionArch2AMI, !Ref 'AWS::Region', !FindInMap [ AWSInstanceType2Arch, !Ref InstanceType, Arch ]]
       SecurityGroups: [ !Ref EC2SecurityGroup ]
@@ -431,22 +431,38 @@ Resources:
               #!/bin/bash -xe
             - |
               yum update -y aws-cfn-bootstrap
-            - '/opt/aws/bin/cfn-init -v '
-            - '         --stack '
-            - !Ref 'AWS::StackName'
-            - '         --resource LaunchConfig '
-            - '         --region '
-            - !Ref 'AWS::Region'
-            - |+
+            # - '/opt/aws/bin/cfn-init -v '
+            # - '         --stack '
+            # - !Ref 'AWS::StackName'
+            # - '         --resource LaunchConfig '
+            # - '         --region '
+            # - !Ref 'AWS::Region'
+            # - |+
               
             - |
-              'cd /app && sudo git submodule update --init --recursive'
+              sudo yum install -y git docker
+            - |
+              sudo systemctl enable docker
+            - |
+              sudo systemctl start docker
+            - 'sudo git clone '
+            - !Sub ${AppSource} /app
+            - |+
+
+            - |
+              cd /app
+            - 'sudo git checkout '
+            - !Sub ${AppBranch}
+            - |+
+
+            - |
+              sudo git submodule update --init --recursive
+            - |
+              sudo docker build -t app:latest /app
+            - |
+              sudo docker run -d -p 80:80 --restart=always app:latest
             - |+
               
-            - |
-              'sudo docker build -t app:latest /app && sudo docker run -d -p 80:80 --restart=always app:latest'
-            - |+
-               
             - '/opt/aws/bin/cfn-signal -e $? '
             - '         --stack '
             - !Ref 'AWS::StackName'
@@ -469,6 +485,7 @@ Resources:
         - Key: Name
           PropagateAtLaunch: True
           Value: !Sub ${EnvironmentName}-ASG
+    DependsOn: [ InternetGatewayAttachment, AZ1NATGateway, AZ2NATGateway, AZ1PrivateSubnetRouteTableAssociation, AZ2PrivateSubnetRouteTableAssociation ]
 
   # Define a scaling policy to maintain an average CPU Util of value specified by operator
   ScalingPolicy:
