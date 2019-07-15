@@ -1,10 +1,6 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: ---
 Parameters:
-  EnvironmentName:
-      Description: An environment name that will be prefixed to resource names. eg. Prod, Test, Dev, etc.
-      Type: String
-
   VpcCIDR:
       Description: Please enter the IP range (CIDR notation) for this VPC
       Type: String
@@ -126,7 +122,7 @@ Resources:
           CidrBlock: !Ref VpcCIDR
           Tags:
             - Key: Name
-              Value: !Ref EnvironmentName
+              Value: !Ref AWS::StackName
 
   # Define an internet egress point
   InternetGateway:
@@ -134,7 +130,7 @@ Resources:
       Properties:
         Tags:
           - Key: Name
-            Value: !Ref EnvironmentName
+            Value: !Ref AWS::StackName
 
   # Link the internet gateway to the VPC created
   InternetGatewayAttachment:
@@ -153,7 +149,7 @@ Resources:
           MapPublicIpOnLaunch: true
           Tags:
             - Key: Name
-              Value: !Sub ${EnvironmentName} Public Subnet (AZ1)
+              Value: !Sub ${AWS::StackName} Public Subnet (AZ1)
 
   AZ2PublicSubnet:
       Type: AWS::EC2::Subnet
@@ -164,7 +160,7 @@ Resources:
           MapPublicIpOnLaunch: true
           Tags:
             - Key: Name
-              Value: !Sub ${EnvironmentName} Public Subnet (AZ2)
+              Value: !Sub ${AWS::StackName} Public Subnet (AZ2)
 
   # Define the private subnets for each AZ
   AZ1PrivateSubnet:
@@ -176,7 +172,7 @@ Resources:
           MapPublicIpOnLaunch: false
           Tags:
             - Key: Name
-              Value: !Sub ${EnvironmentName} Private Subnet (AZ1)
+              Value: !Sub ${AWS::StackName} Private Subnet (AZ1)
 
   AZ2PrivateSubnet:
       Type: AWS::EC2::Subnet
@@ -187,7 +183,7 @@ Resources:
           MapPublicIpOnLaunch: false
           Tags:
             - Key: Name
-              Value: !Sub ${EnvironmentName} Private Subnet (AZ2)
+              Value: !Sub ${AWS::StackName} Private Subnet (AZ2)
 
   # Create a NAT gateway for each AZ using an elastic IP
   AZ1NATGatewayEIP:
@@ -222,7 +218,7 @@ Resources:
           VpcId: !Ref VPC
           Tags:
             - Key: Name
-              Value: !Sub ${EnvironmentName} Public Routes
+              Value: !Sub ${AWS::StackName} Public Routes
 
   DefaultPublicRoute:
       Type: AWS::EC2::Route
@@ -252,7 +248,7 @@ Resources:
           VpcId: !Ref VPC
           Tags:
             - Key: Name
-              Value: !Sub ${EnvironmentName} Private Routes (AZ1)
+              Value: !Sub ${AWS::StackName} Private Routes (AZ1)
 
   AZ1DefaultPrivateRoute:
       Type: AWS::EC2::Route
@@ -273,7 +269,7 @@ Resources:
           VpcId: !Ref VPC
           Tags:
             - Key: Name
-              Value: !Sub ${EnvironmentName} Private Routes (AZ2)
+              Value: !Sub ${AWS::StackName} Private Routes (AZ2)
 
   AZ2DefaultPrivateRoute:
       Type: AWS::EC2::Route
@@ -301,19 +297,19 @@ Resources:
           IpProtocol: -1
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName}-LoadBalancerSG
+          Value: !Sub ${AWS::StackName}-LoadBalancerSG
 
   # Define an application load balancer connected to both public AZs
   LoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Name: !Ref EnvironmentName
+      Name: !Ref AWS::StackName
       Subnets: [ !Ref AZ1PublicSubnet, !Ref AZ2PublicSubnet ]
       SecurityGroups:
         - !Ref LoadBalancerSecurityGroup
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName}-LoadBalancer
+          Value: !Sub ${AWS::StackName}-LoadBalancer
 
   # Define a listener for the load balancer (Port 80)
   LoadBalancerListener:
@@ -331,7 +327,7 @@ Resources:
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Name: !Sub ${EnvironmentName}-DefaultTargetGroup
+      Name: !Sub ${AWS::StackName}-DefaultTargetGroup
       VpcId: !Ref VPC
       Port: 80
       Protocol: HTTP
@@ -357,7 +353,7 @@ Resources:
           Description: Access via LoadBalancer only
       Tags:
         - Key: Name
-          Value: !Sub ${EnvironmentName}-EC2SG
+          Value: !Sub ${AWS::StackName}-EC2SG
 
   # Define the launch configuration for each new instance
   ASGLaunchConfig:
@@ -401,7 +397,7 @@ Resources:
   AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
-      AutoScalingGroupName: !Sub ${EnvironmentName}-ASG
+      AutoScalingGroupName: !Sub ${AWS::StackName}-ASG
       VPCZoneIdentifier:  [ !Ref AZ1PrivateSubnet, !Ref AZ2PrivateSubnet ]
       LaunchConfigurationName: !Ref ASGLaunchConfig
       MinSize: !Ref InitialClusterSize
@@ -410,7 +406,7 @@ Resources:
       Tags:
         - Key: Name
           PropagateAtLaunch: True
-          Value: !Sub ${EnvironmentName}-ASG
+          Value: !Sub ${AWS::StackName}-ASG
     DependsOn: [ InternetGatewayAttachment, AZ1NATGateway, AZ2NATGateway, AZ1PrivateSubnetRouteTableAssociation, AZ2PrivateSubnetRouteTableAssociation ]
 
   # Define a scaling policy to maintain an average CPU Util of value specified by operator
