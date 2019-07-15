@@ -27,7 +27,7 @@ ParameterKey=AppBranch,ParameterValue='master'
 aws cloudformation describe-stacks --stack-name 'Production' --query "Stacks[0].Outputs[?OutputKey=='AppURL'].OutputValue" --output text
 ```
 ### Web UI Deployment
-1. Download the latest copy of the cloudformation template either by cloning the repository, downloading and extracting the repository zip, or directly from [here|https://raw.githubusercontent.com/adrianmace/rea-syseng-prac/master/deploy,yml] (Right Click > Save Target As)
+1. Download the latest copy of the cloudformation template either by cloning the repository, downloading and extracting the repository zip, or directly from [here](https://raw.githubusercontent.com/adrianmace/rea-syseng-prac/master/deploy.yml) (Right Click > Save Target As)
 2. Browse to https://console.aws.amazon.com/cloudformation and select `Create stack`
 3. Upload the template file downloaded in Step 1 and proceed through the prompts to deploy this solution
 4. After approximately 10 minutes, your URL will be available within the Outputs tab at the top of the screen
