@@ -1,4 +1,4 @@
-FROM ruby:2.6.3-slim
+FROM ruby:2.6.3-slim@sha256:3bfe39071381aba5fd69949acf0e521828f435dfad5fb85e156248edd398ae44
 ENV APP_ROOT /app
 
 RUN mkdir -p $APP_ROOT
