@@ -4,7 +4,7 @@
 1. You can manually deploy this stack using the AWS CLI utility. This method assumes you have already configured the utility with credentials.
 2. Clone the repository: `git clone https://github.com/adrianmace/rea-syseng-prac`
 3. Change into the repo directory: `cd rea-syseng-prac`
-4. Run the following command block:
+4. Run the following command block (adjusting any parameter as desired):
 ```
 aws cloudformation create-stack \
 --stack-name 'Production' \
