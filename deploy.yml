@@ -299,8 +299,10 @@ Resources:
       VpcId: !Ref VPC
       GroupDescription: Access to the application load balancer
       SecurityGroupIngress:
-        # Allow access from anywhere to our EC2 services
+        # Allow access from anywhere to our backend via port 80
         - CidrIp: 0.0.0.0/0
+          FromPort: 80
+          ToPort: 80
           IpProtocol: -1
       Tags:
         - Key: Name
