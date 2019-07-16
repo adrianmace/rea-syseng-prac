@@ -63,7 +63,7 @@ aws cloudformation describe-stacks --stack-name 'Production' --query "Stacks[0].
 #### Lack of Conditionals
 I would like to extend upon this solution by placing more power in the hands of the Operator. This includes allowing the Operator to define an SSL certificate; triggering deployment of a secure listener, defining customised SecurityGroupIngress resources at deploy time to modify firewalls, and customising other hardcoded areas such as the included health checks and ScalingPolicy metrics used
 #### Lack of CI/CD
-I hope to incorporate this within a CodeDeploy Cloudformation CI pipeline that pulls the latest source direct from the submodule defined within this git repository. I remained concious of the time required to include such workflow and have opted to instead focus on a reliable IAC deployment with supplimenting documentation
+I hope to incorporate this within a CodeDeploy Cloudformation CI pipeline that pulls the latest source direct from the submodule defined within this git repository. I remained concious of the time required to include such workflow and have opted to instead focus on a reliable infrastructure-as-code deployment with supplimenting documentation
 #### Lack of Nested CFN Stacks
 As the preferred method of submission was a public github repository, I opted to keep this solution simple and use a single template file for Cloudformation. I believe that the solution would have benefited from a nested Cloudformation stack (separating VPC, Security Groups, Application Load Balancers, and Auto Scaling Groups) which would have avoided the need for the DependsOn property upon the AutoScalingGroup resource
 #### Lack of Monitoring
