@@ -55,7 +55,6 @@ aws cloudformation describe-stacks --stack-name 'Production' --query "Stacks[0].
 * Instances exist only within the Private Subnet for each Availability Zone within the Auto Scaling Group
 * Instances connect out to the internet only via the NATGateway resource within each AZ
 * Communications from the internet into the application exist only via an Application Load Balancer, configured only for access on port 80
-* TODO: Configure HTTPS listener within Application Load Balancer if SSL certificate is provided by operator
 #### Anti-Fragility
 * By making use of the sanitisation features within the Cloudformation templating syntax, users are guided away from submitting deployment-breaking user-inputs.
 
