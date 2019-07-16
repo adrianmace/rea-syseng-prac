@@ -416,6 +416,17 @@ Resources:
         - Key: Name
           PropagateAtLaunch: True
           Value: !Sub ${AWS::StackName}-ASG
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: 2
+        MaxBatchSize: 1
+        PauseTime: PT2M
+        SuspendProcesses:
+          - HealthCheck
+          - ReplaceUnhealthy
+          - AZRebalance
+          - AlarmNotification
+          - ScheduledActions
     DependsOn: [ InternetGatewayAttachment, AZ1NATGateway, AZ2NATGateway, AZ1PrivateSubnetRouteTableAssociation, AZ2PrivateSubnetRouteTableAssociation ]
 
   # Define a scaling policy to maintain an average CPU Util of value specified by operator

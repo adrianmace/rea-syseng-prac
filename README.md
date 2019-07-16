@@ -49,7 +49,7 @@ aws cloudformation describe-stacks --stack-name 'Production' --query "Stacks[0].
 * The use of Cloudformation allows for deployment ensures that the entire environment can be brought up using only a few commands
 #### Idempotency
 * This stack can be deployed on top of itself with no issues, adjusting and updating resources as required
-* TODO: Define UpdatePolicy on ASG to ensure a rolling, zero-downtime upgrade is performed when LaunchConfiguration is adjusted
+* Defined UpdatePolicy on ASG ensures a rolling, zero-downtime upgrade is performed when LaunchConfiguration is adjusted
 #### Security
 * Instances are secured by using the hardened Amazon Linux 2 AMI with only minimal packages installed and enabled
 * Instances exist only within the Private Subnet for each Availability Zone within the Auto Scaling Group
